@@ -22,9 +22,9 @@ def get_opts():
         help='Number of training examples from task 1')
     parser.add_argument('--t1_valid', type=int, default=None,
         help='Number of validation examples from task 1')
-    parser.add_argument('-k', type=int, required=True,
+    parser.add_argument('-k', '--examples-per-class', dest='k', type=int, required=True,
         help='Number of examples per class for training on task 2')
-    parser.add_argument('-n', type=int, required=True,
+    parser.add_argument('-n', '--classes', type=int, dest='n', required=True,
         help='Number of classes for training on task 1 & task 2')
     parser.add_argument('--t2_test', type=int, default=None,
         help='Number of test examples from task 2')
