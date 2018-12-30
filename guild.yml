@@ -1,34 +1,46 @@
 - config: model-base
   operations:
     train:
+      description: Train the {{model-name}} model
       pre-process: |
         # Copy opts and modify paths to use run dir (cwd)
-        cp trained_models/${dataset}/${dataset}_${k}_${n}/{{model_name}}/opts.txt opts.txt
+        cp trained_models/${dataset}/${dataset}_${k}_${n}/{{model-name}}/opts.txt opts.txt
         sed -i '/-dp/c\-dp ./data' opts.txt
         sed -i '/-sd/c\-sd .' opts.txt
         sed -i '/-lf/c\-lf log.txt' opts.txt
-      #exec: python -m main @opts.txt
-      main: guild.pass floopsy boonsy
+      exec: python -m main @opts.txt
       requires:
         - experiment-opts
         - ${dataset}-dataset
+      compare:
+        - =dataset
+        - =n
+        - =k
+        - test_acc
       flags:
         k:
+          description: Number of labeled examples available per class
           required: yes
+          arg-skip: yes
           choices: [1, 5, 10, 50, 100, 200, 300, 500, 1000]
-          arg-skip: yes
         n:
+          description: Number of classes
           required: yes
+          arg-skip: yes
           choices: [5, 10, 50, 100, 1000]
-          arg-skip: yes
         dataset:
+          description: Data set to train on
           required: yes
-          choices:
-            - isolet
-            - mnist
-            - omniglot
-            - tiny_imagenet
           arg-skip: yes
+          choices:
+            - value: isolet
+              description: ISOLET data set
+            - value: mnist
+              description: MNIST data set
+            - value: omniglot
+              description: Omniglot data set for one-shot learning
+            - value: tiny_imagenet
+              description: Tiny ImageNet data set
   resources:
     experiment-opts:
       sources:
@@ -46,6 +58,40 @@
           sha256: f7ae60f92e00ec6debd23a6088c31dbd2371eca3ffa0defaefb259924204aec6
 
 - model: baseline
+  description: Non-transfer baseline
   extends: model-base
   params:
-    model_name: baseline
+    model-name: baseline
+
+- model: weight-adapt
+  description: WeightAdapt method
+  extends: model-base
+  params:
+    model-name: adap_hist_loss
+
+- model: hist-loss
+  description: AdapHistLoss method
+  extends: model-base
+  params:
+    model-name: adap_hist_loss
+
+- model: proto-net
+  description: ProtoNet method
+  extends: model-base
+  params:
+    model-name: adap_proto_net
+
+- model: adap-hist-loss
+  description: AdapHistLoss method
+  extends: model-base
+  params:
+    model-name: adap_hist_loss
+
+- model: adapt-proto-net
+  description: ProtoNet method
+  extends: model-base
+  params:
+    model-name: adap_proto_net
+
+
+    hist_loss  proto_net  weight_transfer

@@ -9,7 +9,7 @@ from data.mnist.read_mnist import MNIST
 from data.isolet.read_isolet import Isolet
 from data.omniglot.read_omniglot import Omniglot
 from data.tiny_imagenet.read_tiny_imagenet import TinyImageNet
-from data.episode_generator import generate_training_episode, generate_evaluation_episode 
+from data.episode_generator import generate_training_episode, generate_evaluation_episode
 from losses.histogram_loss import train_batches
 from models.hist_model import *
 from models.proto_model import *
@@ -18,7 +18,7 @@ from models.baseline_model import *
 from models.recall_at_kappa import recall_at_kappa_leave_one_out, recall_at_kappa_support_query
 from utils import classification_batch_evaluation, hist_loss_batch_eval, proto_episodic_performance, proto_performance
 
-def train_classification(sess, model, data, params, weight_transfer=True):
+def train_classification(sess, model, data, params, writer, weight_transfer=True):
     (x_train, y_train), (x_valid, y_valid), (x_train2, y_train2), (x_test2, y_test2) = data
 
     if weight_transfer:
@@ -36,6 +36,7 @@ def train_classification(sess, model, data, params, weight_transfer=True):
 
             print('valid [{} / {}] valid accuracy: {}'.format(epoch, params['epochs'] + 1, valid_acc))
             logging.info('valid [{} / {}] valid accuracy: {}'.format(epoch, params['epochs'] + 1, valid_acc))
+            writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="valid_acc", simple_value=valid_acc)]), epoch)
 
             if valid_acc > initial_best_epoch['valid_acc']:
                 initial_best_epoch['epoch'] = epoch
@@ -66,6 +67,7 @@ def train_classification(sess, model, data, params, weight_transfer=True):
 
         print('train [{} / {}] train accuracy: {}'.format(epoch, params['epochs'] + 1, train_acc))
         logging.info('train [{} / {}] train accuracy: {}'.format(epoch, params['epochs'] + 1, train_acc))
+        writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="train_acc", simple_value=train_acc)]), epoch)
 
         if train_acc > transfer_best_epoch['train_acc']:
             transfer_best_epoch['epoch'] = epoch
@@ -85,8 +87,9 @@ def train_classification(sess, model, data, params, weight_transfer=True):
     print('test accuracy: {}'.format(transfer_best_epoch['test_acc']))
     logging.info('Transfer training done \n')
     logging.info('test accuracy: {}'.format(transfer_best_epoch['test_acc']))
+    writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="test_acc", simple_value=transfer_best_epoch['test_acc'])]), transfer_best_epoch['epoch'])
 
-def train_histogram_loss(sess, model, data, params):
+def train_histogram_loss(sess, model, data, writer, params):
     (x_train, y_train), (x_valid, y_valid), (x_train2, y_train2), (x_test2, y_test2) = data
 
     initial_best_epoch = {'epoch': -1, 'valid_acc': -1, 'test_acc': -1}
@@ -111,6 +114,7 @@ def train_histogram_loss(sess, model, data, params):
 
         print('valid [{} / {}] valid accuracy: {}'.format(epoch, params['epochs'] + 1, valid_recall_at_one))
         logging.info('valid [{} / {}] valid accuracy: {}'.format(epoch, params['epochs'] + 1, valid_recall_at_one))
+        writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="valid_acc", simple_value=valid_recall_at_one)]), epoch)
 
         if valid_recall_at_one > initial_best_epoch['valid_acc']:
             initial_best_epoch['epoch'] = epoch
@@ -136,6 +140,7 @@ def train_histogram_loss(sess, model, data, params):
         print('test accuracy: {}'.format(initial_best_epoch['test_acc']))
         logging.info('Optimization Finished \n')
         logging.info('test accuracy: {}'.format(initial_best_epoch['test_acc']))
+        writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="test_acc", simple_value=initial_best_epoch['test_acc'])]), initial_best_epoch['epoch'])
         return
 
     print('Initial training done \n')
@@ -166,6 +171,7 @@ def train_histogram_loss(sess, model, data, params):
 
         print('train [{} / {}] train accuracy: {}'.format(epoch, params['epochs'] + 1, train_recall_at_one))
         logging.info('train [{} / {}] train accuracy: {}'.format(epoch, params['epochs'] + 1, train_recall_at_one))
+        writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="train_acc", simple_value=train_recall_at_one)]), epoch)
 
         if train_recall_at_one > transfer_best_epoch['train_acc']:
             transfer_best_epoch['epoch'] = epoch
@@ -189,8 +195,9 @@ def train_histogram_loss(sess, model, data, params):
     print('test accuracy: {}'.format(transfer_best_epoch['test_acc']))
     logging.info('Transfer training done \n')
     logging.info('test accuracy: {}'.format(transfer_best_epoch['test_acc']))
+    writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="test_acc", simple_value=transfer_best_epoch['test_acc'])]), transfer_best_epoch['epoch'])
 
-def train_proto_nets(sess, model, data, params):
+def train_proto_nets(sess, model, data, writer, params):
     (x_train, y_train), (x_valid, y_valid), (x_train2, y_train2), (x_test2, y_test2) = data
 
     i = 1
@@ -216,6 +223,9 @@ def train_proto_nets(sess, model, data, params):
             valid_cost, valid_acc = float(valid_cost), float(valid_acc)
             print('valid [{}] valid cost: {} valid accuracy: {}'.format(i, valid_cost, valid_acc))
             logging.info('valid [{}] valid cost: {} valid accuracy: {}'.format(i, valid_cost, valid_acc))
+            writer.add_summary(tf.Summary(value=[
+                tf.Summary.Value(tag="valid_cost", simple_value=valid_cost),
+                tf.Summary.Value(tag="valid_acc", simple_value=valid_acc)]), i)
 
             if valid_acc > best_episode['valid_acc']:
                 best_episode['episode'] = i
@@ -239,6 +249,7 @@ def train_proto_nets(sess, model, data, params):
         print('test accuracy: {}'.format(best_episode['test_acc']))
         logging.info('Optimization Finished \n')
         logging.info('test accuracy: {}'.format(best_episode['test_acc']))
+        writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="test_acc", simple_value=best_episode['test_acc'])]), best_episode['episode'])
         return
 
     print('Initial training done \n')
@@ -266,7 +277,7 @@ def train_proto_nets(sess, model, data, params):
             feed_dict[model.p] = prototypes
         else:
             feed_dict[model.support] = support_batch
-        
+
         sess.run(model.optimize, feed_dict=feed_dict)
 
         if i % 200 == 1:
@@ -275,6 +286,9 @@ def train_proto_nets(sess, model, data, params):
             train_perf[1] = float(train_perf[1])
             print('train [{}] train cost: {} train accuracy: {}'.format(i, train_perf[1], train_perf[0]))
             logging.info('train [{}] train cost: {} train accuracy: {}'.format(i, train_perf[1], train_perf[0]))
+            writer.add_summary(tf.Summary(value=[
+                tf.Summary.Value(tag="train_cost", simple_value=train_perf[1]),
+                tf.Summary.Value(tag="train_acc", simple_value=train_perf[0])]), i)
 
             if train_perf[0] > transfer_best_episode['train_acc']:
                 transfer_best_episode['episode'] = i
@@ -296,13 +310,14 @@ def train_proto_nets(sess, model, data, params):
     print('test accuracy: {}'.format(transfer_best_episode['test_acc']))
     logging.info('Transfer training done \n')
     logging.info('test accuracy: {}'.format(transfer_best_episode['test_acc']))
+    writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag="test_acc", simple_value=transfer_best_episode['test_acc'])]), transfer_best_episode['episode'])
 
 def get_model(params):
     model, data = None, None
     if params['command'] == 'hist_loss':
         if params['dataset'] == 'mnist':
             model = MNISTHistModel(params)
-            data = MNIST(params['data_path']).kntl_data_form(params['t1_train'], params['t1_valid'], 
+            data = MNIST(params['data_path']).kntl_data_form(params['t1_train'], params['t1_valid'],
                 params['k'], params['n'], params['t2_test'])
         elif params['dataset'] == 'isolet':
             model = IsoletHistModel(params)
@@ -316,7 +331,7 @@ def get_model(params):
     elif params['command'] == 'proto':
         if params['dataset'] == 'mnist':
             model = MNISTProtoModel(params)
-            data = MNIST(params['data_path']).kntl_data_form(params['t1_train'], params['t1_valid'], 
+            data = MNIST(params['data_path']).kntl_data_form(params['t1_train'], params['t1_valid'],
                 params['k'], params['n'], params['t2_test'])
         elif params['dataset'] == 'isolet':
             model = IsoletProtoModel(params)
@@ -330,7 +345,7 @@ def get_model(params):
     elif params['command'] == 'weight_transfer':
         if params['dataset'] == 'mnist':
             model = MNISTWeightTransferModel(params)
-            data = MNIST(params['data_path']).kntl_data_form(params['t1_train'], params['t1_valid'], 
+            data = MNIST(params['data_path']).kntl_data_form(params['t1_train'], params['t1_valid'],
                 params['k'], params['n'], params['t2_test'])
         elif params['dataset'] == 'isolet':
             model = IsoletWeightTransferModel(params)
@@ -344,7 +359,7 @@ def get_model(params):
     elif params['command'] == 'baseline':
         if params['dataset'] == 'mnist':
             model = MNISTBaselineModel(params)
-            data = MNIST(params['data_path']).kntl_data_form(params['t1_train'], params['t1_valid'], 
+            data = MNIST(params['data_path']).kntl_data_form(params['t1_train'], params['t1_valid'],
                 params['k'], params['n'], params['t2_test'])
         elif params['dataset'] == 'isolet':
             model = IsoletBaselineModel(params)
@@ -369,6 +384,8 @@ def run(params):
     random.seed(params['random_seed'])
     initialization_seq = random.sample(range(50000), params['replications'])
 
+    writer = tf.summary.FileWriter(params['save_dir'])
+
     config = tf.ConfigProto(allow_soft_placement=True)
     config.gpu_options.allow_growth = True
     for rep in range(params['replications']):
@@ -376,16 +393,16 @@ def run(params):
         with tf.Session(config=config) as sess:
             #tf.set_random_seed(initialization_seq[rep])
             np.random.seed(initialization_seq[rep])
-            
+
             model, data = get_model(params)
             assert not model is None
             assert not data is None
-            
+
             init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
             params['init'] = init
             model.create_saver()
             sess.run(init)
-            
+
             rep_path = os.path.join(params['save_dir'], 'replication{}'.format(rep + 1))
             os.mkdir(rep_path)
             model.config['save_dir_by_rep'] = rep_path
@@ -393,13 +410,13 @@ def run(params):
             logging.debug('running training/testing')
 
             if params['command'] == 'baseline':
-                train_classification(sess, model, data, params, weight_transfer=False)
+                train_classification(sess, model, data, params, writer, weight_transfer=False)
             elif params['command'] == 'weight_transfer':
-                train_classification(sess, model, data, params, weight_transfer=True)
+                train_classification(sess, model, data, params, writer, weight_transfer=True)
             elif params['command'] == 'hist_loss':
-                train_histogram_loss(sess, model, data, params)
+                train_histogram_loss(sess, model, data, params, writer)
             elif params['command'] == 'proto':
-                train_proto_nets(sess, model, data, params)
+                train_proto_nets(sess, model, data, params, writer)
             else:
                 print('Unknown model type')
                 logging.debug('Unknown model type')
